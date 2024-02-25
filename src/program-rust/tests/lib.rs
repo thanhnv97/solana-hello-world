@@ -44,7 +44,7 @@ async fn test_helloworld() {
         0
     );
 
-    // Greet once
+    // Greet once - increment
     let mut transaction = Transaction::new_with_payer(
         &[Instruction::new_with_bincode(
             program_id,
@@ -69,7 +69,7 @@ async fn test_helloworld() {
         1
     );
 
-    // Greet again
+    // Greet again - decrement
     let mut transaction = Transaction::new_with_payer(
         &[Instruction::new_with_bincode(
             program_id,
@@ -91,6 +91,36 @@ async fn test_helloworld() {
         GreetingAccount::try_from_slice(&greeted_account.data)
             .unwrap()
             .counter,
-        2
+        0
+    );
+
+    // Greet again - set value
+    let arr = u32::to_le_bytes(100);
+    let mut instruction_data = [2; 5];
+    for i in 0..4 {
+        instruction_data[i+1] = arr[i];
+    }
+    let mut transaction = Transaction::new_with_payer(
+        &[Instruction::new_with_bincode(
+            program_id,
+            &instruction_data, // ignored but makes the instruction unique in the slot
+            vec![AccountMeta::new(greeted_pubkey, false)],
+        )],
+        Some(&payer.pubkey()),
+    );
+    transaction.sign(&[&payer], recent_blockhash);
+    banks_client.process_transaction(transaction).await.unwrap();
+
+    // Verify account has two greetings
+    let greeted_account = banks_client
+        .get_account(greeted_pubkey)
+        .await
+        .expect("get_account")
+        .expect("greeted_account not found");
+    assert_eq!(
+        GreetingAccount::try_from_slice(&greeted_account.data)
+            .unwrap()
+            .counter,
+        100
     );
 }
